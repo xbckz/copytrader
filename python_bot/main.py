@@ -3,6 +3,7 @@ Main entry point for Solana Copy Trading Bot
 """
 import asyncio
 import signal
+import platform
 from typing import List, Dict
 from datetime import datetime
 
@@ -56,8 +57,9 @@ class CopyTradingBot:
         logger.info("Initializing bot components...")
 
         try:
-            # Initialize database
-            await init_database()
+            # Initialize database (optional - for trade history persistence)
+            # Commented out by default - uncomment if you want to track trades in a database
+            # await init_database()
 
             # Initialize Solana client
             self.solana_client = SolanaClient(
@@ -254,13 +256,14 @@ class CopyTradingBot:
 
     async def run(self):
         """Main run loop"""
-        # Setup signal handlers
-        loop = asyncio.get_event_loop()
-        for sig in (signal.SIGTERM, signal.SIGINT):
-            loop.add_signal_handler(
-                sig,
-                lambda: asyncio.create_task(self.shutdown())
-            )
+        # Setup signal handlers (Unix only - Windows doesn't support add_signal_handler)
+        if platform.system() != 'Windows':
+            loop = asyncio.get_event_loop()
+            for sig in (signal.SIGTERM, signal.SIGINT):
+                loop.add_signal_handler(
+                    sig,
+                    lambda: asyncio.create_task(self.shutdown())
+                )
 
         try:
             await self.initialize()
