@@ -281,7 +281,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def main():
     """Main entry point"""
-    bot_token = settings.telegram_bot_token
+    bot_token = "8540352317:AAGvvraBvgZRbpL9zey54F39Ux35Wv74LHU"
 
     if not bot_token:
         print("ERROR: TELEGRAM_BOT_TOKEN not set in .env file")
