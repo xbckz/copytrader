@@ -71,8 +71,14 @@ async def init_database(database_url: str = None):
 
     try:
         # Create engine
+        # Convert async SQLAlchemy URL to sync for migrations/initialization
+        if 'sqlite+aiosqlite://' in db_url:
+            db_url = db_url.replace('sqlite+aiosqlite://', 'sqlite:///')
+        elif 'aiosqlite://' in db_url:
+            db_url = db_url.replace('aiosqlite://', 'sqlite:///')
+
         engine = create_engine(
-            db_url.replace('aiosqlite://', 'sqlite:///'),
+            db_url,
             echo=False
         )
 
