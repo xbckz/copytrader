@@ -30,3 +30,6 @@ rich>=13.7.0
 
 # Async support
 asyncio>=3.4.3
+
+# Telegram Bot
+python-telegram-bot>=20.7

@@ -19,6 +19,7 @@ from .trading.price_tracker import PriceTracker
 from .trading.executor import TradeExecutor
 from .strategy.engine import StrategyEngine
 from .database.models import init_database
+from .telegram.bot import TelegramBot
 
 # Setup logger
 logger = setup_logger(
@@ -40,6 +41,7 @@ class CopyTradingBot:
         self.wallet_tracker: WalletTracker = None
         self.price_tracker: PriceTracker = None
         self.trade_executor: TradeExecutor = None
+        self.telegram_bot: TelegramBot = None
 
         self.strategy_engines: List[StrategyEngine] = []
         self.is_running = False
@@ -111,6 +113,18 @@ class CopyTradingBot:
 
             # Initialize strategy engines
             await self._initialize_strategies()
+
+            # Initialize Telegram bot if token is provided
+            if settings.telegram_bot_token:
+                try:
+                    self.telegram_bot = TelegramBot(
+                        trading_bot=self,
+                        bot_token=settings.telegram_bot_token
+                    )
+                    logger.info("Telegram bot initialized")
+                except Exception as e:
+                    logger.warning(f"Failed to initialize Telegram bot: {e}")
+                    self.telegram_bot = None
 
             logger.info("All components initialized successfully")
 
@@ -189,6 +203,14 @@ class CopyTradingBot:
             for engine in self.strategy_engines:
                 await engine.start()
 
+            # Start Telegram bot
+            if self.telegram_bot:
+                try:
+                    await self.telegram_bot.start()
+                    logger.info("Telegram bot started")
+                except Exception as e:
+                    logger.warning(f"Failed to start Telegram bot: {e}")
+
             logger.info("=" * 80)
             logger.info("BOT STARTED - Monitoring for trades")
             logger.info("=" * 80)
@@ -212,6 +234,14 @@ class CopyTradingBot:
         # Stop all strategy engines
         for engine in self.strategy_engines:
             await engine.stop()
+
+        # Stop Telegram bot
+        if self.telegram_bot:
+            try:
+                await self.telegram_bot.stop()
+                logger.info("Telegram bot stopped")
+            except Exception as e:
+                logger.warning(f"Error stopping Telegram bot: {e}")
 
         # Stop price tracker
         await self.price_tracker.stop()
