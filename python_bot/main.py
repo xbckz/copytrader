@@ -6,18 +6,18 @@ import signal
 from typing import List, Dict
 from datetime import datetime
 
-from config import settings
-from config.strategies import STRATEGIES, get_all_strategies, print_strategy_comparison
-from utils.logger import setup_logger, get_logger
-from blockchain.solana_client import SolanaClient
-from blockchain.transaction_monitor import TransactionMonitor
-from monitoring.kolscan import KOLscanClient
-from monitoring.wallet_tracker import WalletTracker
-from trading.dex_client import JupiterClient
-from trading.price_tracker import PriceTracker
-from trading.executor import TradeExecutor
-from strategy.engine import StrategyEngine
-from database.models import init_database
+from .config import settings
+from .config.strategies import STRATEGIES, get_all_strategies, print_strategy_comparison
+from .utils.logger import setup_logger, get_logger
+from .blockchain.solana_client import SolanaClient
+from .blockchain.transaction_monitor import TransactionMonitor
+from .monitoring.kolscan import KOLscanClient
+from .monitoring.wallet_tracker import WalletTracker
+from .trading.dex_client import JupiterClient
+from .trading.price_tracker import PriceTracker
+from .trading.executor import TradeExecutor
+from .strategy.engine import StrategyEngine
+from .database.models import init_database
 
 # Setup logger
 logger = setup_logger(
