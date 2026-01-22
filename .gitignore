@@ -1,5 +1,44 @@
+# Node.js
 node_modules/
 dist/
+npm-debug.log*
+
+# Environment
+.env
 .env.local
+.env.*.local
+
+# Logs
 *.log
+logs/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+copytrader.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
 .DS_Store
+Thumbs.db
+
+# Build
+build/
+*.egg-info/
