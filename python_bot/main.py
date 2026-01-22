@@ -2,7 +2,6 @@
 Main entry point for Solana Copy Trading Bot
 """
 import asyncio
-import signal
 from typing import List, Dict
 from datetime import datetime
 
@@ -254,14 +253,6 @@ class CopyTradingBot:
 
     async def run(self):
         """Main run loop"""
-        # Setup signal handlers
-        loop = asyncio.get_event_loop()
-        for sig in (signal.SIGTERM, signal.SIGINT):
-            loop.add_signal_handler(
-                sig,
-                lambda: asyncio.create_task(self.shutdown())
-            )
-
         try:
             await self.initialize()
             await self.start()
