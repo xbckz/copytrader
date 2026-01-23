@@ -126,6 +126,22 @@ class TelegramHandlers:
         """Handle /status command"""
         await self._show_status(update.message)
 
+    async def stats_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle /stats command"""
+        await self._show_stats(update.message)
+
+    async def wallets_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle /wallets command"""
+        await self._show_wallets(update.message)
+
+    async def positions_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle /positions command"""
+        await self._show_positions(update.message)
+
+    async def settings_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle /settings command"""
+        await self._show_settings(update.message)
+
     # ==================== Callback Handler ====================
 
     async def button_callback(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -214,7 +230,7 @@ class TelegramHandlers:
 
     async def _show_main_menu(self, query):
         """Show main menu"""
-        status = await self.backend.get_bot_status()
+        status = self.backend.get_bot_status()  # Not async
         active_session = self.backend.get_active_session()
 
         is_running = "🟢 Running" if status['is_running'] else "🔴 Stopped"
@@ -235,9 +251,9 @@ class TelegramHandlers:
 
     # ==================== Status ====================
 
-    async def _show_status(self, query):
+    async def _show_status(self, query_or_message):
         """Show bot status"""
-        status = await self.backend.get_bot_status()
+        status = self.backend.get_bot_status()  # Not async
         active_session = self.backend.get_active_session()
 
         is_running = "🟢 Running" if status['is_running'] else "🔴 Stopped"
@@ -269,11 +285,15 @@ class TelegramHandlers:
             f"\n⏰ {datetime.now().strftime('%H:%M:%S')}"
         )
 
-        await self._safe_edit_message(query, status_text, get_back_button())
+        # Handle both message and query
+        if hasattr(query_or_message, 'edit_message_text'):
+            await self._safe_edit_message(query_or_message, status_text, get_back_button())
+        else:
+            await query_or_message.reply_text(status_text, reply_markup=get_back_button())
 
     # ==================== Statistics ====================
 
-    async def _show_stats(self, query):
+    async def _show_stats(self, query_or_message):
         """Show performance statistics"""
         overall_stats = self.backend.get_overall_statistics()
         sessions = self.backend.list_sessions()
@@ -304,7 +324,11 @@ class TelegramHandlers:
                     f"  Trades: {session_stats['total_trades']} | Win: {session_stats['win_rate']:.1f}%\n"
                 )
 
-        await self._safe_edit_message(query, stats_text, get_back_button())
+        # Handle both message and query
+        if hasattr(query_or_message, 'edit_message_text'):
+            await self._safe_edit_message(query_or_message, stats_text, get_back_button())
+        else:
+            await query_or_message.reply_text(stats_text, reply_markup=get_back_button())
 
     # ==================== Balance ====================
 
@@ -550,7 +574,7 @@ class TelegramHandlers:
 
     # ==================== Wallets ====================
 
-    async def _show_wallets(self, query):
+    async def _show_wallets(self, query_or_message):
         """Show wallets overview"""
         wallet_stats = self.backend.get_wallet_statistics()
         wallets = self.backend.list_wallets()
@@ -576,7 +600,11 @@ class TelegramHandlers:
         else:
             wallets_text += "No wallets tracked yet.\nAdd a wallet to get started!"
 
-        await self._safe_edit_message(query, wallets_text, get_wallets_management_keyboard())
+        # Handle both message and query
+        if hasattr(query_or_message, 'edit_message_text'):
+            await self._safe_edit_message(query_or_message, wallets_text, get_wallets_management_keyboard())
+        else:
+            await query_or_message.reply_text(wallets_text, reply_markup=get_wallets_management_keyboard())
 
     async def _start_add_wallet(self, query, context):
         """Start wallet addition process"""
@@ -636,7 +664,7 @@ class TelegramHandlers:
 
     # ==================== Positions ====================
 
-    async def _show_positions(self, query):
+    async def _show_positions(self, query_or_message):
         """Show positions overview"""
         active_session = self.backend.get_active_session()
 
@@ -660,7 +688,11 @@ class TelegramHandlers:
                 f"✅ Win Rate: {active_session.get_win_rate():.1f}%\n"
             )
 
-        await self._safe_edit_message(query, pos_text, get_positions_keyboard())
+        # Handle both message and query
+        if hasattr(query_or_message, 'edit_message_text'):
+            await self._safe_edit_message(query_or_message, pos_text, get_positions_keyboard())
+        else:
+            await query_or_message.reply_text(pos_text, reply_markup=get_positions_keyboard())
 
     async def _show_open_positions(self, query):
         """Show open positions"""
@@ -710,7 +742,7 @@ class TelegramHandlers:
 
     # ==================== Settings ====================
 
-    async def _show_settings(self, query):
+    async def _show_settings(self, query_or_message):
         """Show settings menu"""
         settings_text = (
             "⚙️ Settings\n"
@@ -722,7 +754,11 @@ class TelegramHandlers:
             "• Helius API: Enabled\n"
         )
 
-        await self._safe_edit_message(query, settings_text, get_back_button())
+        # Handle both message and query
+        if hasattr(query_or_message, 'edit_message_text'):
+            await self._safe_edit_message(query_or_message, settings_text, get_back_button())
+        else:
+            await query_or_message.reply_text(settings_text, reply_markup=get_back_button())
 
     # ==================== Bot Control ====================
 
@@ -737,3 +773,18 @@ class TelegramHandlers:
         await self.backend.stop_bot()
         await query.answer("⏸️ Bot stopped!", show_alert=True)
         await self._show_main_menu(query)
+
+    # ==================== Error Handler ====================
+
+    async def error_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle errors"""
+        logger.error(f"Telegram bot error: {context.error}", exc_info=context.error)
+
+        # Try to notify the user
+        if update and update.effective_message:
+            try:
+                await update.effective_message.reply_text(
+                    "❌ An error occurred. Please try again later."
+                )
+            except Exception as e:
+                logger.error(f"Failed to send error message: {e}")
