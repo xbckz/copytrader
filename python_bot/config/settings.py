@@ -50,14 +50,14 @@ class Settings(BaseSettings):
         description="KOLscan API endpoint"
     )
 
-    # Helius API (for enhanced Solana data)
+    # Helius API
     helius_api_key: Optional[str] = Field(
         default=None,
-        description="Helius API key for enhanced RPC access"
+        description="Helius API key for enhanced RPC"
     )
     use_helius: bool = Field(
         default=False,
-        description="Use Helius enhanced RPC endpoints"
+        description="Use Helius enhanced RPC"
     )
 
     # Trading Configuration
