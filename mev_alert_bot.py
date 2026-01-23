@@ -6,6 +6,7 @@ Monitors Solana wallets and sends alerts when non-MEV-protected transactions are
 
 import asyncio
 import os
+import traceback
 from datetime import datetime
 from typing import Dict, Set
 from dotenv import load_dotenv
@@ -108,7 +109,8 @@ class WalletMonitor:
                     await self.send_non_mev_alert(sig_str, sig_info.slot)
 
         except Exception as e:
-            print(f"⚠ Error checking transactions for {self.name}: {e}")
+            print(f"⚠ Error checking transactions for {self.name}: {type(e).__name__}: {e}")
+            traceback.print_exc()
 
     async def send_non_mev_alert(self, signature: str, slot: int):
         """Send alert for non-MEV-protected transaction"""
