@@ -35,16 +35,18 @@ bot_application = None
 class WalletMonitor:
     """Monitors a single wallet and sends alerts"""
 
-    def __init__(self, address: str, name: str, rpc_url: str, chat_id: int):
+    def __init__(self, address: str, name: str, rpc_url: str, chat_id: int, poll_interval: float = 2.0):
         self.address = address
         self.name = name
         self.rpc_url = rpc_url
         self.chat_id = chat_id
+        self.poll_interval = poll_interval  # Base polling interval
         self.seen_signatures: Set[str] = set()
         self.is_running = True
         self.checker: Optional[MEVProtectionChecker] = None
         self.rate_limit_backoff = 1.0  # Initial backoff in seconds
         self.consecutive_errors = 0
+        self.check_count = 0
 
     async def start_monitoring(self):
         """Start monitoring the wallet"""
@@ -74,9 +76,16 @@ class WalletMonitor:
 
             # Start monitoring loop
             while self.is_running:
+                self.check_count += 1
                 await self.check_transactions()
+
                 # Use adaptive sleep time based on rate limit backoff
-                sleep_time = max(5.0, self.rate_limit_backoff)
+                # If rate limited, use backoff time; otherwise use configured poll interval
+                if self.consecutive_errors > 0:
+                    sleep_time = self.rate_limit_backoff
+                else:
+                    sleep_time = self.poll_interval
+
                 await asyncio.sleep(sleep_time)
 
         except asyncio.CancelledError:
@@ -103,8 +112,12 @@ class WalletMonitor:
                 # Reset backoff on successful request
                 self.rate_limit_backoff = 1.0
                 self.consecutive_errors = 0
+                # Log every 20 checks when no transactions found
+                if self.check_count % 20 == 0:
+                    print(f"✓ {self.name}: Checked {self.check_count} times, monitoring active...")
                 return
 
+            new_tx_count = 0
             for sig_info in response.value:
                 sig_str = str(sig_info.signature)
 
@@ -117,13 +130,21 @@ class WalletMonitor:
                     continue
 
                 self.seen_signatures.add(sig_str)
+                new_tx_count += 1
 
                 # Check if it's a Jito transaction
                 is_mev_protected = await self.checker._check_if_jito_transaction(sig_str)
 
                 # Send alert if NOT MEV protected
                 if not is_mev_protected:
+                    print(f"🚨 {self.name}: Non-MEV transaction detected! Sending alert...")
                     await self.send_non_mev_alert(sig_str, sig_info.slot)
+                else:
+                    print(f"🔒 {self.name}: MEV-protected transaction detected (no alert)")
+
+            # Log when new transactions are found
+            if new_tx_count > 0 and self.check_count > 1:  # Skip first check
+                print(f"📊 {self.name}: Found {new_tx_count} new transaction(s)")
 
             # Reset backoff on successful request
             self.rate_limit_backoff = 1.0
@@ -268,8 +289,9 @@ async def add_wallet_command(update: Update, context: ContextTypes.DEFAULT_TYPE)
     # Start monitoring - pass RPC URL, not checker instance
     chat_id = update.effective_chat.id
     rpc_url = os.getenv("SOLANA_RPC_URL", "https://api.mainnet-beta.solana.com")
+    poll_interval = float(os.getenv("POLL_INTERVAL", "2.0"))  # Default 2 seconds
 
-    monitor = WalletMonitor(address, name, rpc_url, chat_id)
+    monitor = WalletMonitor(address, name, rpc_url, chat_id, poll_interval)
     task = asyncio.create_task(monitor.start_monitoring())
     monitoring_tasks[address] = task
 
@@ -385,9 +407,11 @@ def main():
         return
 
     rpc_url = os.getenv("SOLANA_RPC_URL", "https://api.mainnet-beta.solana.com")
+    poll_interval = float(os.getenv("POLL_INTERVAL", "2.0"))
 
     print("🤖 MEV Alert Bot Starting...")
     print(f"📡 Solana RPC: {rpc_url}")
+    print(f"⏱️  Poll Interval: {poll_interval}s")
 
     # Warn about public RPC limits
     if "api.mainnet-beta.solana.com" in rpc_url:
@@ -396,7 +420,10 @@ def main():
         print("   - Helius (https://helius.dev)")
         print("   - QuickNode (https://quicknode.com)")
         print("   - Alchemy (https://alchemy.com)")
-        print("   Set SOLANA_RPC_URL in your .env file\n")
+        print("   Set SOLANA_RPC_URL in your .env file")
+        if poll_interval < 2.0:
+            print(f"   ⚠️  Poll interval ({poll_interval}s) may cause rate limiting with public RPC")
+        print()
 
     # Create application
     bot_application = Application.builder().token(token).build()
