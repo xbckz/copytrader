@@ -340,7 +340,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE, is_ca
         await update.message.reply_text(help_text, reply_markup=reply_markup, parse_mode='Markdown')
 
 
-async def main():
+def main():
     """Start the bot"""
     global bot_application
 
@@ -368,11 +368,12 @@ async def main():
     print("✅ Bot started! Send /start to your bot in Telegram.")
     print("Press Ctrl+C to stop\n")
 
-    await bot_application.run_polling(allowed_updates=Update.ALL_TYPES)
+    # run_polling() is synchronous and manages its own event loop
+    bot_application.run_polling(allowed_updates=Update.ALL_TYPES)
 
 
 if __name__ == "__main__":
     try:
-        asyncio.run(main())
+        main()
     except KeyboardInterrupt:
         print("\n\n🛑 Bot stopped by user")
