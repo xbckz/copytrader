@@ -43,6 +43,8 @@ class WalletMonitor:
         self.seen_signatures: Set[str] = set()
         self.is_running = True
         self.checker: Optional[MEVProtectionChecker] = None
+        self.rate_limit_backoff = 1.0  # Initial backoff in seconds
+        self.consecutive_errors = 0
 
     async def start_monitoring(self):
         """Start monitoring the wallet"""
@@ -73,7 +75,9 @@ class WalletMonitor:
             # Start monitoring loop
             while self.is_running:
                 await self.check_transactions()
-                await asyncio.sleep(3.0)  # Check every 3 seconds
+                # Use adaptive sleep time based on rate limit backoff
+                sleep_time = max(5.0, self.rate_limit_backoff)
+                await asyncio.sleep(sleep_time)
 
         except asyncio.CancelledError:
             print(f"🛑 Stopped monitoring {self.name}")
@@ -96,6 +100,9 @@ class WalletMonitor:
             )
 
             if not response.value:
+                # Reset backoff on successful request
+                self.rate_limit_backoff = 1.0
+                self.consecutive_errors = 0
                 return
 
             for sig_info in response.value:
@@ -118,9 +125,27 @@ class WalletMonitor:
                 if not is_mev_protected:
                     await self.send_non_mev_alert(sig_str, sig_info.slot)
 
+            # Reset backoff on successful request
+            self.rate_limit_backoff = 1.0
+            self.consecutive_errors = 0
+
         except Exception as e:
-            print(f"⚠ Error checking transactions for {self.name}: {type(e).__name__}: {e}")
-            traceback.print_exc()
+            error_str = str(e)
+
+            # Check if it's a rate limit error (429)
+            if "429" in error_str or "Too Many Requests" in error_str:
+                self.consecutive_errors += 1
+                # Exponential backoff: 5s, 10s, 20s, 40s, max 60s
+                self.rate_limit_backoff = min(5.0 * (2 ** (self.consecutive_errors - 1)), 60.0)
+
+                if self.consecutive_errors == 1:
+                    print(f"⚠ Rate limit hit for {self.name}. Backing off to {self.rate_limit_backoff}s intervals")
+                elif self.consecutive_errors % 5 == 0:
+                    print(f"⚠ Still rate limited for {self.name} (backoff: {self.rate_limit_backoff}s)")
+            else:
+                # For non-rate-limit errors, print the full error
+                print(f"⚠ Error checking transactions for {self.name}: {type(e).__name__}: {e}")
+                traceback.print_exc()
 
     async def send_non_mev_alert(self, signature: str, slot: int):
         """Send alert for non-MEV-protected transaction"""
@@ -359,8 +384,19 @@ def main():
         print("❌ TELEGRAM_BOT_TOKEN not found in .env file!")
         return
 
+    rpc_url = os.getenv("SOLANA_RPC_URL", "https://api.mainnet-beta.solana.com")
+
     print("🤖 MEV Alert Bot Starting...")
-    print(f"📡 Solana RPC: {os.getenv('SOLANA_RPC_URL', 'https://api.mainnet-beta.solana.com')}")
+    print(f"📡 Solana RPC: {rpc_url}")
+
+    # Warn about public RPC limits
+    if "api.mainnet-beta.solana.com" in rpc_url:
+        print("\n⚠️  WARNING: Using public RPC endpoint with strict rate limits")
+        print("   For production use, consider using a dedicated RPC provider:")
+        print("   - Helius (https://helius.dev)")
+        print("   - QuickNode (https://quicknode.com)")
+        print("   - Alchemy (https://alchemy.com)")
+        print("   Set SOLANA_RPC_URL in your .env file\n")
 
     # Create application
     bot_application = Application.builder().token(token).build()
