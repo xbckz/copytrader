@@ -8,7 +8,7 @@ import asyncio
 import os
 import traceback
 from datetime import datetime
-from typing import Dict, Set
+from typing import Dict, Set, Optional
 from dotenv import load_dotenv
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
@@ -35,19 +35,24 @@ bot_application = None
 class WalletMonitor:
     """Monitors a single wallet and sends alerts"""
 
-    def __init__(self, address: str, name: str, checker: MEVProtectionChecker, chat_id: int):
+    def __init__(self, address: str, name: str, rpc_url: str, chat_id: int):
         self.address = address
         self.name = name
-        self.checker = checker
+        self.rpc_url = rpc_url
         self.chat_id = chat_id
         self.seen_signatures: Set[str] = set()
         self.is_running = True
+        self.checker: Optional[MEVProtectionChecker] = None
 
     async def start_monitoring(self):
         """Start monitoring the wallet"""
         print(f"🔍 Started monitoring {self.name} ({self.address[:8]}...)")
 
         try:
+            # Create checker in the monitoring task's async context
+            self.checker = MEVProtectionChecker(rpc_url=self.rpc_url)
+            await self.checker.connect()
+
             # Validate address
             pubkey = await self.checker.validate_address(self.address)
             if not pubkey:
@@ -72,9 +77,14 @@ class WalletMonitor:
 
         except asyncio.CancelledError:
             print(f"🛑 Stopped monitoring {self.name}")
+            if self.checker:
+                await self.checker.close()
         except Exception as e:
             print(f"❌ Error monitoring {self.name}: {e}")
+            traceback.print_exc()
             await self.send_alert(f"❌ Error monitoring {self.name}: {e}")
+            if self.checker:
+                await self.checker.close()
 
     async def check_transactions(self):
         """Check for new transactions"""
@@ -230,14 +240,11 @@ async def add_wallet_command(update: Update, context: ContextTypes.DEFAULT_TYPE)
     # Add wallet
     tracked_wallets[address] = name
 
-    # Start monitoring
+    # Start monitoring - pass RPC URL, not checker instance
     chat_id = update.effective_chat.id
-    checker = MEVProtectionChecker(
-        rpc_url=os.getenv("SOLANA_RPC_URL", "https://api.mainnet-beta.solana.com")
-    )
-    await checker.connect()
+    rpc_url = os.getenv("SOLANA_RPC_URL", "https://api.mainnet-beta.solana.com")
 
-    monitor = WalletMonitor(address, name, checker, chat_id)
+    monitor = WalletMonitor(address, name, rpc_url, chat_id)
     task = asyncio.create_task(monitor.start_monitoring())
     monitoring_tasks[address] = task
 
