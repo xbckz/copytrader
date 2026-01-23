@@ -4,6 +4,7 @@ Run this instead of python_bot/main.py
 """
 import asyncio
 import signal
+import sys
 from python_bot.services.bot_backend import CopyTradingBackend
 from python_bot.telegram.bot import TelegramBot
 from python_bot.telegram.handlers import TelegramHandlers
@@ -140,10 +141,11 @@ async def main():
     """Main entry point"""
     bot = SimpleBot()
 
-    # Handle signals
-    loop = asyncio.get_event_loop()
-    for sig in (signal.SIGTERM, signal.SIGINT):
-        loop.add_signal_handler(sig, lambda: asyncio.create_task(bot.stop()))
+    # Handle signals (only on Unix-like systems, Windows doesn't support add_signal_handler)
+    if sys.platform != 'win32':
+        loop = asyncio.get_event_loop()
+        for sig in (signal.SIGTERM, signal.SIGINT):
+            loop.add_signal_handler(sig, lambda: asyncio.create_task(bot.stop()))
 
     await bot.start()
 
