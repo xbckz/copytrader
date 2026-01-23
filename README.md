@@ -1,53 +1,155 @@
-# Solana Copy Trading Bot
+# MEV Alert Bot for Solana
 
-A Telegram bot for copy trading on Solana blockchain with wallet tracking and automated trading strategies.
+A simple Telegram bot that monitors Solana wallets and sends alerts when they make **non-MEV-protected** transactions.
+
+## What Does It Do?
+
+This bot:
+1. 📍 Tracks Solana wallet addresses you specify
+2. 🔍 Monitors every transaction they make in real-time
+3. 🚨 Sends you a Telegram alert when they make a transaction **WITHOUT** MEV protection (no Jito)
+4. ✅ Silent when they use MEV protection (Jito)
+
+## Why Is This Useful?
+
+- **Copy Trading**: Know when traders you follow stop using MEV protection
+- **Security**: Get alerted if your own wallet makes unprotected transactions
+- **Research**: Study MEV protection adoption patterns
 
 ## Quick Start
 
-### Installation
+### 1. Install Dependencies
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### Configuration
+### 2. Configure Bot
 
-Create a `.env` file with:
-```
-TELEGRAM_BOT_TOKEN=your_telegram_bot_token
-HELIUS_API_KEY=your_helius_api_key (optional)
-SOLANA_RPC_URL=https://api.devnet.solana.com (optional)
-```
-
-### Run
+Create a `.env` file:
 
 ```bash
-python run_bot_new.py
+# Required
+TELEGRAM_BOT_TOKEN=your_bot_token_from_@BotFather
+
+# Optional (defaults to mainnet)
+SOLANA_RPC_URL=https://api.mainnet-beta.solana.com
 ```
 
-## Features
+### 3. Run
 
-- 🎯 **Wallet Tracking**: Monitor profitable traders and copy their moves
-- 💰 **Multiple Strategies**: Conservative, Balanced, and Aggressive trading strategies
-- 📊 **Session Management**: Track multiple trading sessions with independent statistics
-- 💼 **Position Management**: Automatic position tracking with P&L calculations
-- 📈 **Trade History**: Complete history of all executed trades
-- ⚡ **Real-time Updates**: Live balance and statistics updates
+```bash
+python mev_alert_bot.py
+```
 
-## Architecture
+## Usage
 
-The bot uses a clean architecture with separated concerns:
+### Start the bot in Telegram
 
-- `python_bot/services/` - Core business logic (backend, sessions, balances)
-- `python_bot/blockchain/` - Blockchain interactions (Solana RPC, Helius API)
-- `python_bot/trading/` - DEX integrations (Jupiter aggregator)
-- `python_bot/telegram/` - Telegram bot interface
-- `python_bot/monitoring/` - Wallet tracking and analysis
+Send `/start` to your bot and you'll see a menu with options:
 
-## Demo Mode
+### Add a wallet to track
 
-If Solana SDK is not installed, the bot runs in demo mode with simulated trading for testing purposes.
+```
+/add <wallet_address> <wallet_name>
+```
+
+Example:
+```
+/add DYw8jCTfwHNRJhhmFcbXvVDTqWMEVFBX6ZKUmG5CNSKK TopTrader
+```
+
+### List all tracked wallets
+
+```
+/list
+```
+
+### Remove a wallet
+
+```
+/remove <wallet_address>
+```
+
+## How It Works
+
+The bot uses **MEV protection detection** to identify transactions:
+
+### MEV Protected (No Alert)
+- Transactions sent through Jito Block Engine
+- Uses Jito tip accounts
+- Bypasses public mempool
+- ✅ **No notification sent**
+
+### Non-MEV Protected (Alert Sent)
+- Regular public transactions
+- Visible in mempool
+- No Jito protection
+- 🚨 **Alert sent to Telegram**
+
+## Example Alert
+
+When a tracked wallet makes a non-protected transaction, you'll receive:
+
+```
+🚨 NON-MEV-PROTECTED TRANSACTION DETECTED!
+
+📛 Wallet: TopTrader
+📍 Address: DYw8jCTfwHNRJh...
+📝 Signature: 5J7zN...
+🔢 Slot: 245123456
+⚠ Status: Public mempool transaction
+
+🔗 View on Solscan
+🔗 View on SolanaFM
+```
+
+## Commands
+
+- `/start` - Show main menu
+- `/add <address> <name>` - Add wallet to track
+- `/remove <address>` - Stop tracking wallet
+- `/list` - Show all tracked wallets
+- `/help` - Show help message
+
+## Requirements
+
+- Python 3.11+
+- Telegram Bot Token (get from [@BotFather](https://t.me/BotFather))
+- Solana RPC endpoint (optional, uses public mainnet by default)
+
+## Advanced Configuration
+
+### Use Custom RPC
+
+For better performance, use a premium RPC provider:
+
+```bash
+SOLANA_RPC_URL=https://your-premium-rpc.com
+```
+
+Recommended providers:
+- Helius
+- QuickNode
+- Alchemy
+
+### Use Devnet for Testing
+
+```bash
+SOLANA_RPC_URL=https://api.devnet.solana.com
+```
+
+## Files
+
+- `mev_alert_bot.py` - Main Telegram bot
+- `mev_protection_checker.py` - MEV detection module
+- `.env` - Configuration (create this)
+- `requirements.txt` - Python dependencies
 
 ## License
 
 MIT
+
+## Disclaimer
+
+This bot is for informational purposes. MEV detection accuracy depends on RPC provider capabilities and network conditions.
