@@ -212,6 +212,136 @@ class MEVProtectionChecker:
         else:
             print(f"    ✗ This address is likely NOT using MEV protection")
 
+    async def check_once(self, address_str: str, limit: int = 20):
+        """
+        Perform a one-time check of recent transactions to detect MEV protection.
+
+        Args:
+            address_str: Solana address to check
+            limit: Number of recent transactions to analyze (default: 20)
+        """
+        # Validate address
+        self.monitored_address = await self.validate_address(address_str)
+        if not self.monitored_address:
+            return
+
+        print(f"\n✓ Analyzing recent transactions for: {address_str}")
+        print(f"  Fetching last {limit} transactions...\n")
+        print("=" * 70)
+
+        try:
+            # Get recent signatures
+            response = await self.client.get_signatures_for_address(
+                self.monitored_address,
+                limit=limit,
+                commitment=Confirmed
+            )
+
+            if not response.value:
+                print("\n  ⚠ No transactions found for this address")
+                return
+
+            print(f"\n  Found {len(response.value)} transactions. Analyzing...\n")
+
+            for sig_info in response.value:
+                sig_str = str(sig_info.signature)
+
+                # Skip failed transactions
+                if sig_info.err is not None:
+                    continue
+
+                # Skip already processed
+                if sig_str in self.confirmed_transactions:
+                    continue
+
+                self.total_transactions += 1
+
+                # Since we're checking historical data, we can't know if they were
+                # pending, so we use heuristics: very fast confirmation suggests MEV
+                # For simplicity, consider all as MEV protected in one-time check
+                # A better heuristic: check transaction details for Jito tip accounts
+
+                # Check if transaction uses Jito (has tip to Jito addresses)
+                is_jito = await self._check_if_jito_transaction(sig_str)
+
+                if is_jito:
+                    self.mev_protected_count += 1
+                    status = TransactionStatus.MEV_PROTECTED
+                    print(f"  🔒 MEV PROTECTED: {sig_str[:16]}... (Slot: {sig_info.slot})")
+                else:
+                    self.public_mempool_count += 1
+                    status = TransactionStatus.CONFIRMED
+                    print(f"  📋 PUBLIC: {sig_str[:16]}... (Slot: {sig_info.slot})")
+
+                event = TransactionEvent(
+                    signature=sig_str,
+                    timestamp=datetime.now(),
+                    status=status,
+                    block_time=sig_info.block_time,
+                    slot=sig_info.slot
+                )
+
+                self.confirmed_transactions[sig_str] = event
+                self.seen_signatures.add(sig_str)
+
+            # Print final statistics
+            print("\n" + "=" * 70)
+            self._print_final_report()
+
+        except Exception as e:
+            print(f"\n✗ Error during analysis: {e}")
+            raise
+
+    async def _check_if_jito_transaction(self, signature: str) -> bool:
+        """
+        Check if a transaction was sent through Jito by looking for Jito tip accounts.
+
+        Known Jito tip accounts:
+        - 96gYZGLnJYVFmbjzopPSU6QiEV5fGqZNyN9nmNhvrZU5
+        - HFqU5x63VTqvQss8hp11i4wVV8bD44PvwucfZ2bU7gRe
+        - Cw8CFyM9FkoMi7K7Crf6HNQqf4uEMzpKw6QNghXLvLkY
+        - ADaUMid9yfUytqMBgopwjb2DTLSokTSzL1zt6iGPaS49
+        - DfXygSm4jCyNCybVYYK6DwvWqjKee8pbDmJGcLWNDXjh
+        - ADuUkR4vqLUMWXxW9gh6D6L8pMSawimctcNZ5pGwDcEt
+        - DttWaMuVvTiduZRnguLF7jNxTgiMBZ1hyAumKUiL2KRL
+        - 3AVi9Tg9Uo68tJfuvoKvqKNWKkC5wPdSSdeBnizKZ6jT
+        """
+        try:
+            # Get transaction details
+            tx_response = await self.client.get_transaction(
+                Signature.from_string(signature),
+                max_supported_transaction_version=0
+            )
+
+            if not tx_response.value:
+                return False
+
+            # Jito tip account addresses
+            jito_tip_accounts = {
+                "96gYZGLnJYVFmbjzopPSU6QiEV5fGqZNyN9nmNhvrZU5",
+                "HFqU5x63VTqvQss8hp11i4wVV8bD44PvwucfZ2bU7gRe",
+                "Cw8CFyM9FkoMi7K7Crf6HNQqf4uEMzpKw6QNghXLvLkY",
+                "ADaUMid9yfUytqMBgopwjb2DTLSokTSzL1zt6iGPaS49",
+                "DfXygSm4jCyNCybVYYK6DwvWqjKee8pbDmJGcLWNDXjh",
+                "ADuUkR4vqLUMWXxW9gh6D6L8pMSawimctcNZ5pGwDcEt",
+                "DttWaMuVvTiduZRnguLF7jNxTgiMBZ1hyAumKUiL2KRL",
+                "3AVi9Tg9Uo68tJfuvoKvqKNWKkC5wPdSSdeBnizKZ6jT",
+            }
+
+            # Check account keys in the transaction
+            if hasattr(tx_response.value.transaction, 'message'):
+                message = tx_response.value.transaction.message
+                if hasattr(message, 'account_keys'):
+                    for account in message.account_keys:
+                        if str(account) in jito_tip_accounts:
+                            return True
+
+            return False
+
+        except Exception:
+            # If we can't fetch transaction details, assume not Jito
+            return False
+
     async def monitor(self, address_str: str, check_interval: float = 2.0):
         """
         Monitor an address for transactions and detect MEV protection.
@@ -304,16 +434,16 @@ async def main():
     print("=" * 70)
     print("MEV PROTECTION CHECKER FOR SOLANA")
     print("=" * 70)
-    print("\nThis tool monitors a Solana address to detect if it's using")
-    print("MEV protection services like Jito's Block Engine.")
+    print("\nThis tool checks if a Solana address is using MEV protection")
+    print("services like Jito's Block Engine.")
     print("\nMEV-protected transactions:")
-    print("  - Appear directly in blocks without mempool visibility")
-    print("  - Use private RPCs to bypass public transaction pools")
+    print("  - Use Jito tip accounts for priority block inclusion")
+    print("  - Bypass public transaction pools via private RPCs")
     print("  - Provide protection against frontrunning and sandwich attacks")
     print()
 
     # Get address from user
-    address_str = input("Enter Solana address to monitor: ").strip()
+    address_str = input("Enter Solana address to check: ").strip()
 
     if not address_str:
         print("✗ No address provided")
@@ -335,8 +465,8 @@ async def main():
         if not await checker.connect():
             return
 
-        # Start monitoring
-        await checker.monitor(address_str, check_interval=2.0)
+        # Perform one-time check of recent transactions
+        await checker.check_once(address_str, limit=20)
 
     finally:
         await checker.close()
