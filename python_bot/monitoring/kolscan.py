@@ -138,52 +138,20 @@ class KOLscanClient:
 
     async def get_fallback_wallets(self, count: int = 100) -> List[Dict[str, Any]]:
         """
-        Get fallback list of popular Solana wallets for testing
-        when KOLscan API is not available
+        Fallback method when KOLscan API is not available
+        Returns empty list - use manual wallet tracking instead
 
         Args:
             count: Number of wallets to return
 
         Returns:
-            List of wallet dictionaries with mock data
+            Empty list (no placeholder data)
         """
-        logger.warning("Using fallback wallet list - KOLscan API not available")
-
-        # Real Solana wallet addresses for top traders/KOLs
-        # Sources: User provided + KOLscan research + public trader wallets
-        known_wallets = [
-            # User provided wallets
-            "7ABz8qEFZTHPkovMDsmQkm64DZWN5wRtU7LEtD2ShkQ6",
-            "J6TDXvarvpBdPXTaTU8eJbtso1PUCYKGkVtMKUUY8iEa",
-
-            # High performing KOL wallets from research
-            "AVAZvHLR2PcWpDf8BXY4rVxNHYRBytycHkcB5z5QNXYm",  # High win rate in early Pump.fun launches
-            "4Be9CvxqHW6BYiRAxW9Q3xu1ycTMWaL5z8NX4HR3ha7t",  # Consistent 50x+ flips on Raydium
-            "8zFZHuSRuDpuAR7J6FzwyF3vKNx4CVW3DFHJerQhc7Zd",  # Smart money insider signals
-
-            # Add more wallet addresses here as you find them
-            # You can get addresses from:
-            # - https://kolscan.io/leaderboard
-            # - https://www.topwallets.ai/top-kols
-            # - https://gmgn.ai/
-            # - Community Discord/Twitter shares
-        ]
-
-        fallback_wallets = []
-
-        # Use real wallet addresses first
-        for i, address in enumerate(known_wallets[:count]):
-            wallet = {
-                'address': address,
-                'pnl': 1000 - (i * 10),  # Decreasing PnL (placeholder metrics)
-                'win_rate': 75 - (i * 0.5),  # Decreasing win rate (placeholder)
-                'total_trades': 100 + i,
-                'rank': i + 1
-            }
-            fallback_wallets.append(wallet)
-
-        logger.info(f"Using {len(fallback_wallets)} real wallet addresses for monitoring")
-        return fallback_wallets
+        logger.warning(
+            "KOLscan API not available. "
+            "Please use manual wallet tracking to add wallets to monitor."
+        )
+        return []
 
     async def __aenter__(self):
         """Async context manager entry"""

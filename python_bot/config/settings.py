@@ -50,10 +50,28 @@ class Settings(BaseSettings):
         description="KOLscan API endpoint"
     )
 
+    # Helius API (for enhanced Solana data)
+    helius_api_key: Optional[str] = Field(
+        default=None,
+        description="Helius API key for enhanced RPC access"
+    )
+    use_helius: bool = Field(
+        default=False,
+        description="Use Helius enhanced RPC endpoints"
+    )
+
     # Trading Configuration
+    initial_balance_eur: float = Field(
+        default=20.0,
+        description="Initial balance in EUR (will be converted to SOL)"
+    )
+    sol_price_eur: float = Field(
+        default=200.0,
+        description="SOL price in EUR (updated dynamically)"
+    )
     initial_balance: float = Field(
         default=100.0,
-        description="Initial balance in SOL"
+        description="Initial balance in SOL (calculated from EUR)"
     )
     min_trade_size: float = Field(
         default=0.01,
@@ -76,6 +94,16 @@ class Settings(BaseSettings):
     priority_fee_lamports: int = Field(
         default=50000,
         description="Priority fee for transaction execution"
+    )
+
+    # Fee Configuration (for realistic simulation)
+    base_network_fee: float = Field(
+        default=0.000005,
+        description="Base Solana network fee in SOL"
+    )
+    jupiter_platform_fee_bps: int = Field(
+        default=25,
+        description="Jupiter platform fee in basis points (0.25%)"
     )
 
     # Strategy Selection
