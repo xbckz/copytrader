@@ -25,7 +25,7 @@ async def test_backend():
 
     # Get bot status
     logger.info("1. Testing bot status...")
-    status = await backend.get_bot_status()
+    status = backend.get_bot_status()  # Not async, don't await
     print(f"   Bot running: {status['is_running']}")
     print(f"   Network: {status['network']}")
     print(f"   SOL price: €{status['sol_price_eur']:.2f}\n")
