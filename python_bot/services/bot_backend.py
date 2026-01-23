@@ -64,19 +64,28 @@ class CopyTradingBackend:
 
             # Initialize Solana client
             self.solana_client = SolanaClient()
-            await self.solana_client.connect()
-            logger.info("Solana client initialized")
+            connected = await self.solana_client.connect()
+            if connected:
+                logger.info("Solana client initialized")
+            else:
+                logger.warning("Solana client not available - running in demo mode")
 
-            # Initialize Jupiter client
-            self.jupiter_client = JupiterClient()
-            await self.jupiter_client.connect()
-            logger.info("Jupiter client initialized")
+            # Initialize Jupiter client (optional)
+            try:
+                self.jupiter_client = JupiterClient()
+                await self.jupiter_client.connect()
+                logger.info("Jupiter client initialized")
+            except Exception as e:
+                logger.warning(f"Jupiter client not available: {e}")
 
             # Initialize KOLscan client (optional)
             if settings.kolscan_api_key:
-                self.kolscan_client = KOLscanClient()
-                await self.kolscan_client.connect()
-                logger.info("KOLscan client initialized")
+                try:
+                    self.kolscan_client = KOLscanClient()
+                    await self.kolscan_client.connect()
+                    logger.info("KOLscan client initialized")
+                except Exception as e:
+                    logger.warning(f"KOLscan client not available: {e}")
 
             # Create default session if none exists
             if not self.session_manager.list_sessions():
