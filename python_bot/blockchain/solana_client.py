@@ -3,18 +3,42 @@ Solana blockchain client for RPC interactions
 """
 import asyncio
 from typing import Optional, List, Dict, Any
-from solana.rpc.async_api import AsyncClient
-from solana.rpc.commitment import Confirmed, Finalized
-from solders.pubkey import Pubkey
-from solders.keypair import Keypair
-from solders.signature import Signature
-from solders.transaction import Transaction
-from solders.system_program import TransferParams, transfer
-from solders.rpc.responses import GetTransactionResp
+
+try:
+    from solana.rpc.async_api import AsyncClient
+    from solana.rpc.commitment import Confirmed, Finalized
+    from solders.pubkey import Pubkey
+    from solders.keypair import Keypair
+    from solders.signature import Signature
+    from solders.transaction import Transaction
+    from solders.system_program import TransferParams, transfer
+    from solders.rpc.responses import GetTransactionResp
+    SOLANA_AVAILABLE = True
+except ImportError:
+    SOLANA_AVAILABLE = False
+    AsyncClient = None
+    Confirmed = None
+    Finalized = None
+    Pubkey = None
+    Keypair = None
+    Signature = None
+    Transaction = None
+    GetTransactionResp = None
 
 from ..config import settings
 from ..utils.logger import get_logger
-from ..utils.helpers import retry_async, lamports_to_sol
+
+try:
+    from ..utils.helpers import retry_async, lamports_to_sol
+except ImportError:
+    # Provide fallback implementations
+    def retry_async(max_retries=3, delay=1.0, backoff=1.0):
+        def decorator(func):
+            return func
+        return decorator
+
+    def lamports_to_sol(lamports):
+        return lamports / 1e9
 
 logger = get_logger(__name__)
 
@@ -43,6 +67,11 @@ class SolanaClient:
 
     async def connect(self):
         """Establish connection to Solana RPC"""
+        if not SOLANA_AVAILABLE:
+            logger.warning("Solana SDK not available - running in demo mode")
+            self._is_connected = False
+            return False
+
         try:
             self.client = AsyncClient(self.rpc_url, commitment=self.commitment)
 
@@ -56,7 +85,7 @@ class SolanaClient:
         except Exception as e:
             logger.error(f"Failed to connect to Solana RPC: {e}")
             self._is_connected = False
-            raise
+            return False
 
     async def disconnect(self):
         """Close connection to Solana RPC"""

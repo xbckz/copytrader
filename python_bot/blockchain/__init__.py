@@ -1,4 +1,4 @@
 from .solana_client import SolanaClient
-from .transaction_monitor import TransactionMonitor
+from .helius_client import HeliusClient
 
-__all__ = ['SolanaClient', 'TransactionMonitor']
+__all__ = ['SolanaClient', 'HeliusClient']
