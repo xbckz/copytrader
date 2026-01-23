@@ -61,7 +61,9 @@ class MEVProtectionChecker:
         try:
             version = await self.client.get_version()
             print(f"✓ Connected to Solana RPC")
-            print(f"  Solana version: {version.value['solana-core']}")
+            # version.value is a RpcVersionInfo object, access as attribute
+            if hasattr(version.value, 'solana_core'):
+                print(f"  Solana version: {version.value.solana_core}")
             return True
         except Exception as e:
             print(f"✗ Failed to connect to RPC: {e}")
